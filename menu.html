@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('styles'); ?>
+    <style>
+      #fields-container {
+        display: flex;
+        gap: 12px; 
+        margin-bottom: 0px;
+      }
+      .select-field {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+      }
+      .select-field:focus {
+        outline: none;
+        border: 1px solid #1a73e8;
+        box-shadow: 0 0 6px rgba(26, 115, 232, 0.4);
+      }
+      #document-selector {
+        margin-bottom: 12px;
+        padding: 12px;
+      }
+      .error {
+        border-color: red;
+        box-shadow: 0 0 6px rgba(255, 0, 0, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <h3 id="title">username</h3>
+
+    <div id="fields-container">
+      <input id="row" class="input-field" type="text" placeholder="Строка" />
+      <input id="column" class="input-field" type="text" placeholder="Столбец" />
+    </div>
+
+    <select id="document-selector" class="select-field">
+      <option value="" disabled selected>Выберите документ</option>
+    </select>
+
+    <button class="button" id="syncData">Синхронизировать</button>
+
+    <div class="small-text" id="logout">Log out</div>
+
+    <div id="loader" class="loader"></div>
+
+    <script>
+      document.getElementById("logout").addEventListener("click", logout);
+      window.addEventListener("load", updateTitleWithUsername);
+
+      document.getElementById("syncData").addEventListener("click", async () => {
+
+        const row = document.getElementById("row").value;
+        const column = document.getElementById("column").value;
+
+        const selector = document.getElementById("document-selector");
+        const sheetName = selector.options[selector.selectedIndex]?.value;
+
+        if (!/^\d*$/.test(row) || !/^[A-Z]*$/.test(column) || sheetName === ""){
+          alert('Неправильно заданы параметры');
+          return;
+        }
+
+        await insertFromDB(row, column, sheetName);
+      });
+
+
+      // validation TODO: move to utils
+      document.getElementById("row").addEventListener('input',function(){
+        const input = this.value;
+         if (!/^\d*$/.test(input)){
+            this.classList.add("error");
+         }else{
+            this.classList.remove("error");
+         }
+      });
+      // validation
+      document.getElementById("column").addEventListener('input',function(){
+        const input = this.value;
+         if (!/^[A-Z]*$/.test(input)){
+            this.classList.add("error");
+         }else{
+            this.classList.remove("error");
+         }
+      });
+
+      window.addEventListener("load", async () => {
+        try {
+          const sheets = await googleScriptRunPromise('getSheetNameList');
+          const selector = document.getElementById("document-selector");
+          
+          if (selector && Array.isArray(sheets)) {
+            sheets.forEach(name => {
+              const option = document.createElement("option");
+              option.value = name; 
+              option.textContent = name; 
+              selector.appendChild(option);
+            });
+          }
+        } catch (error) {
+          console.error("Ошибка загрузки списка документов:", error);
+        }
+      });
+
+      async function insertFromDB(row, column, sheetName){
+        const button = document.getElementById("syncData");
+        try{
+          console.log('start insert')
+          showLoader(true);
+          button.disabled = true;
+          await googleScriptRunPromise('updateClientListWithStatus', row, columnToNumber(column), sheetName);
+        }
+        catch(e){
+          alert(e);
+        }
+        finally{
+          button.disabled = false;
+          showLoader(false);
+        }
+
+      }
+
+      function columnToNumber(column) {
+        let result = 0;
+
+        column = column.toUpperCase();
+
+        for (let i = 0; i < column.length; i++) {
+          const charCode = column.charCodeAt(i) - 64; 
+          result = result * 26 + charCode; 
+        }
+
+        return result;
+      }
+
+      async function updateTitleWithUsername() {
+        const titleElement = document.getElementById("title");
+        const userData = await googleScriptRunPromise('loadUserData');
+
+        if (titleElement && userData.username) {
+          titleElement.textContent = userData.username;
+
+          setTimeout(() => {
+            titleElement.style.opacity = "1"; // Активируем анимацию
+          }, 50);
+        } else {
+          console.error("Элемент заголовка или имя пользователя не найдены.");
+        }
+      }
+
+      async function logout() {
+        try {
+          showLoader(true);
+          await googleScriptRunPromise("clearUserData");
+          await googleScriptRunPromise("showAuth");
+        } catch (error) {
+          alert(error?.message);
+        } finally {
+          showLoader(false);
+        }
+      }
+
+      function showLoader(show) {
+        const loader = document.getElementById("loader");
+        if (loader) {
+          loader.style.display = show ? "block" : "none";
+        }
+      }
+
+      function googleScriptRunPromise(functionName, ...args) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((result) => resolve(result))
+            .withFailureHandler((error) => reject(error))
+            [functionName](...args);
+        });
+      }
+    </script>
+  </body>
+</html>
