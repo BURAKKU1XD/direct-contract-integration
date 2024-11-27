@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('styles'); ?>
+  </head>
+  <body>
+    <h3 id='title'>Авторизация</h3>
+    <input id="username" class="input-field" type="text" placeholder="Введите имя пользователя" autocomplete="username" />
+    <button class="button" id="auth" type="button">Войти</button>
+    <div class="small-text" id="toggleRegistrationLogin">Регистрация</div>
+    <div id="loader" class="loader"></div>
+
+    <script>
+      const authButton = document.getElementById("auth");
+      const toggleButton = document.getElementById("toggleRegistrationLogin");
+
+      authButton.addEventListener("click", authorize);
+      toggleButton.addEventListener("click", toggleRegistrationLogin);
+
+      const modes = { login: 'login', registration: 'registration' };
+      let currentMode = modes.login;
+
+
+      function toggleRegistrationLogin() {
+        currentMode = currentMode === modes.login ? modes.registration : modes.login;
+        updateUIForMode(currentMode);
+      }
+
+      function updateUIForMode(mode) {
+        const title = document.getElementById("title");
+        const button = document.getElementById("auth");
+        const smallText = document.getElementById("toggleRegistrationLogin");
+
+        if (mode === modes.registration) {
+          title.textContent = 'Регистрация';
+          button.textContent = 'Регистрация';
+          smallText.textContent = 'Войти';
+          button.removeEventListener("click", authorize);
+          button.addEventListener("click", registration);
+        } else {
+          title.textContent = 'Авторизация';
+          button.textContent = 'Войти';
+          smallText.textContent = 'Регистрация';
+          button.removeEventListener("click", registration);
+          button.addEventListener("click", authorize);
+        }
+      }
+
+
+      async function authorize() {
+        const username = document.getElementById("username").value.trim();
+        const loader = document.getElementById("loader");
+
+        if (!username) {
+          alert("Введите имя пользователя");
+          return;
+        }
+
+        showLoader(true); 
+
+        try {
+          const loginResult = await googleScriptRunPromise("authorization", username);
+
+          const menuResult = await googleScriptRunPromise("showMenu");
+        } catch (error) {
+          console.error("Ошибка авторизации:", error);
+          alert(error?.message ?? 'Ошибка авторизации');
+        } finally {
+          showLoader(false);
+        }
+      }
+
+      async function registration() {
+        const username = document.getElementById("username").value.trim();
+        const loader = document.getElementById("loader");
+
+        if (!username) {
+          alert("Введите имя пользователя!");
+          return;
+        }
+
+        showLoader(true);
+
+        try {
+          const registrationResult = await googleScriptRunPromise("registration", username);
+
+          const menuResult = await googleScriptRunPromise("showMenu");
+        } catch (error) {
+          console.error("Ошибка регистрации:", error);
+          alert(error?.message ?? 'Ошибка регистрации');
+        } finally {
+          showLoader(false);
+        }
+      }
+
+      function showLoader(show) {
+        const loader = document.getElementById("loader");
+        if (loader) {
+          loader.style.display = show ? "block" : "none";
+        }
+      }
+
+      function googleScriptRunPromise(functionName, ...args) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((result) => resolve(result))
+            .withFailureHandler((error) => reject(error))
+            [functionName](...args);
+        });
+      }
+
+    </script>
+  </body>
+</html>
+
